@@ -469,7 +469,7 @@ body::before{background:var(--card)}
 <div class="app" id="app" dir="rtl" lang="ar">
   <aside class="rail" id="rail" aria-label="القائمة">
     <div class="brand">
-      <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20h20"/><path d="M4 20V9l6-4 6 4v11"/><path d="M16 12h4v8"/><path d="M8 20v-4h4v4"/><path d="M8 11h.01M12 11h.01"/></svg></div>
+      <div class="logo" style="background:none;padding:0;overflow:hidden"><img src="icon-192.png" alt="" style="width:100%;height:100%;display:block"></div>
       <div><b>سنام للمقاولات</b><small>نظام إدارة المشاريع والحسابات</small></div>
     </div>
     <nav class="nav" id="nav"></nav>
@@ -524,7 +524,7 @@ window.SANAM_CFG={url:"https://lhamdnaxioxqptkylvkg.supabase.co",key:"eyJhbGciOi
 
   function loginBox(msg){
     const w=document.createElement("div");w.id="sbLogin";w.dir="rtl";
-    w.innerHTML=`<form><div class="lg-logo">س</div><h2>سنام للمقاولات</h2><p>سجّل دخولك عشان تفتح البرنامج</p>
+    w.innerHTML=`<form><div class="lg-logo" style="background:none;overflow:hidden"><img src="icon-192.png" alt="" style="width:100%;height:100%"></div><h2>سنام للمقاولات</h2><p>سجّل دخولك عشان تفتح البرنامج</p>
       <label>الإيميل<input type="email" name="e" autocomplete="username" required></label>
       <label>كلمة السر<input type="password" name="p" autocomplete="current-password" required></label>
       <div class="lg-err">${msg||""}</div><button type="submit">دخول</button><a href="#" class="lg-sw">أول مرة؟ اعمل حساب جديد</a></form>`;
