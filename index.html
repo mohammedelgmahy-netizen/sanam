@@ -515,22 +515,29 @@ window.SANAM_CFG={url:"https://lhamdnaxioxqptkylvkg.supabase.co",key:"eyJhbGciOi
   function listen(){if(live)return;live=true;
     sb.channel("sanam-all").on("postgres_changes",{event:"*",schema:"public",table:T},p=>{
       const r=p.eventType==="DELETE"?p.old:p.new;if(!r||!r.collection)return;const x=C(r.collection);
-      if(p.eventType==="DELETE")x.map.delete(r.id);else x.map.set(r.id,{id:r.id,data:r.data||{}});emit(r.collection)}).subscribe()}
-  async function load(c){const x=C(c);let from=0;const page=1000;
-    for(;;){const{data,error}=await sb.from(T).select("id,data").eq("collection",c).range(from,from+page-1);if(error)throw error;
-      data.forEach(r=>x.map.set(r.id,{id:r.id,data:r.data||{}}));if(data.length<page)break;from+=page}
-    x.loaded=true;emit(c)}
+      if(p.eventType==="DELETE")x.map.delete(r.id);else x.map.set(r.id,{id:r.id,data:r.data||{}});emit(r.collection);saveCache()}).subscribe()}
+  const ck=()=>"sanam-cache-"+(me&&me.id);let saveT=null;
+  const saveCache=()=>{clearTimeout(saveT);saveT=setTimeout(()=>{try{const o={};Object.keys(cols).forEach(c=>{if(cols[c].loaded)o[c]=[...cols[c].map.values()]});localStorage.setItem(ck(),JSON.stringify(o))}catch(e){}},400)};
+  let cached=null;
+  function fromCache(c){if(cached===null){try{cached=JSON.parse(localStorage.getItem(ck())||"{}")}catch(e){cached={}}}
+    const rows=cached[c];if(!rows)return false;const x=C(c);rows.forEach(r=>x.map.set(r.id,r));x.loaded=true;emit(c);return true}
+  let allP=null;
+  function loadAll(){return allP||(allP=(async()=>{const got={};let from=0;const page=1000;
+    for(;;){const{data,error}=await sb.from(T).select("collection,id,data").range(from,from+page-1);if(error)throw error;
+      data.forEach(r=>(got[r.collection]||(got[r.collection]=[])).push({id:r.id,data:r.data||{}}));if(data.length<page)break;from+=page}
+    return got})())}
+  async function load(c){const hadCache=fromCache(c);const got=await loadAll();const x=C(c);x.map=new Map((got[c]||[]).map(r=>[r.id,r]));x.loaded=true;emit(c);saveCache();void hadCache}
   const db={collection:c=>({
     doc:id=>({
-      set:async body=>{const{error}=await sb.from(T).upsert({collection:c,id,data:body,updated_at:new Date().toISOString()},{onConflict:"owner,collection,id"});if(error)throw error;C(c).map.set(id,{id,data:body});emit(c)},
-      delete:async()=>{const{error}=await sb.from(T).delete().eq("collection",c).eq("id",id);if(error)throw error;C(c).map.delete(id);emit(c)}}),
+      set:async body=>{const{error}=await sb.from(T).upsert({collection:c,id,data:body,updated_at:new Date().toISOString()},{onConflict:"owner,collection,id"});if(error)throw error;C(c).map.set(id,{id,data:body});emit(c);saveCache()},
+      delete:async()=>{const{error}=await sb.from(T).delete().eq("collection",c).eq("id",id);if(error)throw error;C(c).map.delete(id);emit(c);saveCache()}}),
     onSnapshot:(cb,onErr)=>{C(c).subs.push(cb);listen();load(c).catch(e=>{console.error(e);onErr&&onErr(e)});return()=>{}}})};
   const user={me:async()=>({name:(me&&(me.user_metadata?.name||me.email))||""}),can:async()=>true};
   const downloads={save:async({filename,data})=>{const u=URL.createObjectURL(data),a=document.createElement("a");a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);return{status:"saved"}}};
   const assets={upload:async blob=>{const path=me.id+"/"+new Date().toISOString().slice(0,7)+"/"+(crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random().toString(36).slice(2))+".jpg";
     const{error}=await sb.storage.from(cfg.bucket).upload(path,blob,{contentType:blob.type||"image/jpeg"});if(error)throw error;
     return{id:path,url:sb.storage.from(cfg.bucket).getPublicUrl(path).data.publicUrl}}};
-  window.sanamLogout=async()=>{await sb.auth.signOut();location.reload()};
+  window.sanamLogout=async()=>{try{localStorage.removeItem(ck())}catch(e){}await sb.auth.signOut();location.reload()};
   window.claude={use:async n=>{await ready;return n==="db"?db:n==="user"?user:n==="downloads"?downloads:n==="assets"?assets:null}};
 
   function loginBox(msg){
@@ -553,6 +560,9 @@ window.SANAM_CFG={url:"https://lhamdnaxioxqptkylvkg.supabase.co",key:"eyJhbGciOi
   async function start(){
     if(!window.supabase||cfg.url.startsWith("__")){loginBox("البرنامج لسه ما اتربطش بـ Supabase.");return}
     sb=window.supabase.createClient(cfg.url,cfg.key);
+    // open straight away with the saved session; supabase refreshes the token in the background
+    try{const k=Object.keys(localStorage).find(k=>/^sb-.*-auth-token$/.test(k));const j=k&&JSON.parse(localStorage.getItem(k));
+      if(j&&j.user){me=j.user;signedIn();sb.auth.getSession().then(({data})=>{if(!data.session)location.reload()});return}}catch(e){}
     const{data}=await sb.auth.getSession();
     if(data.session){me=data.session.user;signedIn()}else loginBox()}
   document.readyState==="loading"?document.addEventListener("DOMContentLoaded",start):start();
