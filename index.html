@@ -743,7 +743,20 @@ function renderNav(){
   $("#railFoot").innerHTML=`<span class="dot ${ft[0]}"></span><span class="lbl">${ft[1]}</span>`;$("#railFoot").title=ft[1];
   const v=VIEWS.find(x=>x.id===S.view)||VIEWS[0];$("#pageTitle").textContent=v.label;$("#backBtn").hidden=S.view==="home";$("#homeBtn").hidden=S.view==="home";$("#pageCrumb").textContent="سنام للمقاولات · "+v.group;
 }
-function go(v,noHist){if(!noHist&&v!==S.view)S.hist.push(S.view);if(v==="home")S.hist=[];S.view=v;$("#app").classList.remove("nav-open");try{history.replaceState(null,"","#"+v)}catch(e){}render();window.scrollTo(0,0)}
+/* Phone back button / edge swipe: every screen, the drawer and every dialog get a history entry, so "back" closes the dialog, then the drawer, then returns to the previous screen instead of leaving the app. */
+let depth=0,ignorePop=false,fromPop=false,modalPushed=false,navPushed=false;
+function go(v,noHist){if(!noHist&&v!==S.view)S.hist.push(S.view);if(v==="home")S.hist=[];S.view=v;
+  const app=$("#app");try{if(navPushed){navPushed=false;history.replaceState({v},"","#"+v)}else if(!noHist&&!fromPop){depth++;history.pushState({v},"","#"+v)}else history.replaceState({v},"","#"+v)}catch(e){}
+  app.classList.remove("nav-open");render();window.scrollTo(0,0)}
+function openNav(){$("#app").classList.add("nav-open");if(!navPushed){navPushed=true;depth++;try{history.pushState({n:1},"")}catch(e){}}}
+function closeNav(){$("#app").classList.remove("nav-open");if(navPushed&&!fromPop){navPushed=false;depth=Math.max(0,depth-1);ignorePop=true;try{history.back()}catch(e){ignorePop=false}}navPushed=false}
+function goBack(){if(depth>0&&!fromPop)history.back();else go(S.hist.pop()||"home",true)}
+window.addEventListener("popstate",()=>{
+  if(ignorePop){ignorePop=false;return}
+  depth=Math.max(0,depth-1);fromPop=true;
+  try{if(modalPushed)closeModal();else if($("#app").classList.contains("nav-open")){navPushed=false;$("#app").classList.remove("nav-open")}else go(S.hist.pop()||"home",true)}finally{fromPop=false}
+});
+new MutationObserver(()=>{if($("#modalRoot").firstElementChild&&!modalPushed){modalPushed=true;depth++;try{history.pushState({m:1},"")}catch(e){}}}).observe($("#modalRoot"),{childList:true});
 
 /* ---------- views ---------- */
 function pageH(text,actions){return `<div class="page-h"><p>${text||""}</p><div class="row">${actions||""}</div></div>`}
@@ -1321,7 +1334,7 @@ function openForm(col,rec,kind){
   $("#modalRoot").innerHTML=`<div class="scrim" data-act="close-scrim"><form class="modal" id="mform" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="modal-h"><span class="kpi-ic t-${hm.tone}" style="width:40px;height:40px">${I(hm.ic)}</span><h3>${esc(title)}</h3><button type="button" class="icon-btn" data-act="close" aria-label="إغلاق">${I("x")}</button></div><div class="modal-b"><div class="form">${formHTML(col,r)}</div><div class="err" id="m-err"></div></div><div class="modal-f"><button class="btn primary" type="submit">${I("check")}حفظ</button><button class="btn" type="button" data-act="close">إلغاء</button></div></form></div>`;
   updInvoice();const first=$("#mform input,#mform select");first&&first.focus();
 }
-function closeModal(){$("#modalRoot").innerHTML="";modalCtx=null}
+function closeModal(){$("#modalRoot").innerHTML="";modalCtx=null;if(modalPushed&&!fromPop){depth=Math.max(0,depth-1);ignorePop=true;try{history.back()}catch(e){ignorePop=false}}modalPushed=false}
 function readForm(){
   const{col,rec}=modalCtx;const v=id=>{const el=$("#m-"+id);return el?el.value.trim():undefined};const out={...rec};
   const set=(...ids)=>ids.forEach(id=>{const x=v(id);if(x!==undefined)out[id]=x});
@@ -1464,10 +1477,10 @@ document.addEventListener("click",e=>{
   if(a==="pay-all"){if(!S.data.accounts.length){toast("ضيف خزنة الأول");return}payAllForm();return}
   if(a==="pay-one"){const e=byId("employees",ds.emp);if(!e)return;const ad=Math.min(Math.max(0,advanceBalance(e.id)),N(e.salary));openForm("txns",null,"salary");$("#m-employeeId").value=e.id;$("#m-base").value=e.salary;$("#m-projectId").value=e.projectId||"";if(ad)$("#m-advanceDeduct").value=ad;updSalary();return}
   if(a==="logout"){if(confirm("تسجيل خروج من البرنامج؟"))window.sanamLogout();return}
-  if(a==="back"){go(S.hist.pop()||"home",true);return}
+  if(a==="back"){goBack();return}
   if(a==="tile-kind"){S.f.dailyKind=ds.kind;go("daily");return}
-  if(a==="open-nav"){$("#app").classList.add("nav-open");return}
-  if(a==="close-nav"){$("#app").classList.remove("nav-open");return}
+  if(a==="open-nav"){openNav();return}
+  if(a==="close-nav"){closeNav();return}
   if(a==="close-scrim"){if(e.target===b)closeModal();return}
   if(a==="close"){closeModal();return}
   if(a==="add-mat"){$("#m-mats").insertAdjacentHTML("beforeend",matHTML({name:"",qty:"",unit:""}));$("#m-mats .mat:last-child input").focus();return}
@@ -1514,7 +1527,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&modalCtx)closeModal
 
 /* ---------- boot ---------- */
 (async function boot(){
-  const h=(location.hash||"").slice(1);if(RENDER[h])S.view=h==="dash"?"home":h;
+  const h=(location.hash||"").slice(1);if(RENDER[h])S.view=h==="dash"?"home":h;try{history.replaceState({v:S.view},"")}catch(e){}
   const nw=new Date();$("#todayTxt").textContent=DAYS[nw.getDay()]+" "+nw.getDate()+" "+MONTHS[nw.getMonth()]+" "+nw.getFullYear();
   const C=window.claude;
   const [d,u,dl,as]=C&&C.use?await Promise.all([C.use("db"),C.use("user"),C.use("downloads"),C.use("assets")].map(p=>p.catch(()=>null))):[null,null,null,null];
