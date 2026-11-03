@@ -743,7 +743,7 @@ function renderNav(){
   $("#railFoot").innerHTML=`<span class="dot ${ft[0]}"></span><span class="lbl">${ft[1]}</span>`;$("#railFoot").title=ft[1];
   const v=VIEWS.find(x=>x.id===S.view)||VIEWS[0];$("#pageTitle").textContent=v.label;$("#backBtn").hidden=S.view==="home";$("#homeBtn").hidden=S.view==="home";$("#pageCrumb").textContent="سنام للمقاولات · "+v.group;
 }
-/* Phone back button / edge swipe: every screen, the drawer and every dialog get a history entry, so "back" closes the dialog, then the drawer, then returns to the previous screen instead of leaving the app. */
+/* Phone back button / edge swipe: the drawer and every dialog get a history entry, so "back" closes the dialog, then the drawer; from any screen one back goes straight to home (extra screen entries are skipped). */
 let depth=0,ignorePop=false,fromPop=false,modalPushed=false,navPushed=false;
 function go(v,noHist){if(!noHist&&v!==S.view)S.hist.push(S.view);if(v==="home")S.hist=[];S.view=v;
   const app=$("#app");try{if(navPushed){navPushed=false;history.replaceState({v},"","#"+v)}else if(!noHist&&!fromPop){depth++;history.pushState({v},"","#"+v)}else history.replaceState({v},"","#"+v)}catch(e){}
@@ -754,7 +754,7 @@ function goBack(){if(depth>0&&!fromPop)history.back();else go(S.hist.pop()||"hom
 window.addEventListener("popstate",()=>{
   if(ignorePop){ignorePop=false;return}
   depth=Math.max(0,depth-1);fromPop=true;
-  try{if(modalPushed)closeModal();else if($("#app").classList.contains("nav-open")){navPushed=false;$("#app").classList.remove("nav-open")}else go(S.hist.pop()||"home",true)}finally{fromPop=false}
+  try{if(modalPushed)closeModal();else if($("#app").classList.contains("nav-open")){navPushed=false;$("#app").classList.remove("nav-open")}else{S.hist=[];go("home",true);const st=history.state;if(st&&st.v&&(st.v!=="home"||depth>0))history.back()}}finally{fromPop=false}
 });
 new MutationObserver(()=>{if($("#modalRoot").firstElementChild&&!modalPushed){modalPushed=true;depth++;try{history.pushState({m:1},"")}catch(e){}}}).observe($("#modalRoot"),{childList:true});
 
