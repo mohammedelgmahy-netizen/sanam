@@ -562,7 +562,7 @@ window.SANAM_CFG={url:"https://lhamdnaxioxqptkylvkg.supabase.co",key:"eyJhbGciOi
     sb=window.supabase.createClient(cfg.url,cfg.key);
     // open straight away with the saved session; supabase refreshes the token in the background
     try{const k=Object.keys(localStorage).find(k=>/^sb-.*-auth-token$/.test(k));const j=k&&JSON.parse(localStorage.getItem(k));
-      if(j&&j.user){me=j.user;signedIn();sb.auth.getSession().then(({data})=>{if(!data.session)location.reload()});return}}catch(e){}
+      if(j&&j.user){me=j.user;signedIn();sb.auth.getSession().then(({data})=>{if(!data.session&&!localStorage.getItem(k))location.reload()}).catch(()=>{});return}}catch(e){}
     const{data}=await sb.auth.getSession();
     if(data.session){me=data.session.user;signedIn()}else loginBox()}
   document.readyState==="loading"?document.addEventListener("DOMContentLoaded",start):start();
@@ -761,6 +761,7 @@ new MutationObserver(()=>{if($("#modalRoot").firstElementChild&&!modalPushed){mo
 /* ---------- views ---------- */
 function pageH(text,actions){return `<div class="page-h"><p>${text||""}</p><div class="row">${actions||""}</div></div>`}
 function banner(){
+  if(S.loadErr)return `<div class="banner slim" style="background:#fdecec;border-color:#f3b4b4;color:#5a1a1a"><span class="row" style="gap:8px">${I("sparkle")}<span><b>مفيش اتصال بقاعدة البيانات</b> · اتأكد من النت، أو إن مشروع Supabase شغال</span></span><button class="btn small" data-act="reload">حاول تاني</button></div>`;
   if(S.demo)return `<div class="banner slim"><span class="row" style="gap:8px">${I("sparkle")}<span><b>بيانات تجريبية</b>${S.view==="home"?" لشركة وهمية عشان تشوف البرنامج. اللي تضيفه هنا مش بيتحفظ.":" · مش بتتحفظ"}</span></span><button class="btn gold small" data-act="exit-demo">ابدأ ببياناتي</button></div>`;
   if(S.mode==="local")return `<div class="banner"><span>البيانات بتتحفظ على المتصفح ده بس. افتح البرنامج من لينك Claude عشان تتحفظ أونلاين وتفتحها من أي جهاز.</span></div>`;
   if(!S.canWrite)return `<div class="banner"><span>معاك صلاحية عرض بس، مش هتقدر تضيف أو تعدل.</span></div>`;
@@ -1477,6 +1478,7 @@ document.addEventListener("click",e=>{
   if(a==="pay-all"){if(!S.data.accounts.length){toast("ضيف خزنة الأول");return}payAllForm();return}
   if(a==="pay-one"){const e=byId("employees",ds.emp);if(!e)return;const ad=Math.min(Math.max(0,advanceBalance(e.id)),N(e.salary));openForm("txns",null,"salary");$("#m-employeeId").value=e.id;$("#m-base").value=e.salary;$("#m-projectId").value=e.projectId||"";if(ad)$("#m-advanceDeduct").value=ad;updSalary();return}
   if(a==="logout"){if(confirm("تسجيل خروج من البرنامج؟"))window.sanamLogout();return}
+  if(a==="reload"){location.reload();return}
   if(a==="back"){goBack();return}
   if(a==="tile-kind"){S.f.dailyKind=ds.kind;go("daily");return}
   if(a==="open-nav"){openNav();return}
@@ -1541,7 +1543,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&modalCtx)closeModal
       // while the demo is showing, live data goes to the saved copy so the demo stays separate
       if(S.demo){if(S.saved)S.saved[c]=list;return}
       S.data[c]=list;if(got.size===COLS.length){if(firstLoad){firstLoad=false;maybeDemo()}render()}
-    },()=>toast("الاتصال بالبيانات وقف. اعمل ريفريش للصفحة.")));
+    },()=>{S.loadErr=true;if(!got.has(c)){got.add(c);if(got.size===COLS.length){firstLoad=false;render()}}else render()}));
   }else{S.mode="local";lsLoad();maybeDemo();render()}
 })();
 })();
