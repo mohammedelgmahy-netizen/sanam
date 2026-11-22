@@ -537,7 +537,7 @@ window.SANAM_CFG={url:"https://lhamdnaxioxqptkylvkg.supabase.co",key:"eyJhbGciOi
   const assets={upload:async blob=>{const path=me.id+"/"+new Date().toISOString().slice(0,7)+"/"+(crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random().toString(36).slice(2))+".jpg";
     const{error}=await sb.storage.from(cfg.bucket).upload(path,blob,{contentType:blob.type||"image/jpeg"});if(error)throw error;
     return{id:path,url:sb.storage.from(cfg.bucket).getPublicUrl(path).data.publicUrl}}};
-  window.sanamLogout=async()=>{if(window.SANAM_DEMO){location.href=location.pathname;return}try{localStorage.removeItem(ck())}catch(e){}await sb.auth.signOut();location.reload()};
+  window.sanamLogout=async()=>{if(window.SANAM_DEMO){try{localStorage.removeItem("sanam-trial-start-on")}catch(e){}location.href=location.pathname;return}try{localStorage.removeItem(ck())}catch(e){}await sb.auth.signOut();location.reload()};
   window.claude={use:async n=>{await ready;if(window.SANAM_DEMO)return n==="downloads"?downloads:null;return n==="db"?db:n==="user"?user:n==="downloads"?downloads:n==="assets"?assets:null}};
 
   function loginBox(msg){
@@ -545,12 +545,14 @@ window.SANAM_CFG={url:"https://lhamdnaxioxqptkylvkg.supabase.co",key:"eyJhbGciOi
     w.innerHTML=`<form><div class="lg-logo" style="background:none;overflow:hidden"><img src="icon-192.png" alt="" style="width:100%;height:100%"></div><h2>سنام للمقاولات</h2><p>سجّل دخولك عشان تفتح البرنامج</p>
       <label>الإيميل<input type="email" name="e" autocomplete="username" required></label>
       <label>كلمة السر<input type="password" name="p" autocomplete="current-password" required></label>
-      <div class="lg-err">${msg||""}</div><button type="submit">دخول</button><a href="#" class="lg-sw">أول مرة؟ اعمل حساب جديد</a><div class="lg-or">أو</div><button type="button" class="lg-demo">دخول تجريبي (من غير حساب)</button></form>`;
+      <div class="lg-err">${msg||""}</div><button type="submit">دخول</button><a href="#" class="lg-sw">أول مرة؟ اعمل حساب جديد</a><div class="lg-or">أو</div><button type="button" class="lg-demo">دخول تجريبي لمدة ٣ أيام</button></form>`;
     document.body.appendChild(w);
     let up=false;const F=w.querySelector("form"),B=F.querySelector("button"),ER=F.querySelector(".lg-err"),SW=F.querySelector(".lg-sw");
     const mode=()=>{B.textContent=up?"إنشاء الحساب":"دخول";SW.textContent=up?"عندي حساب، رجوع للدخول":"أول مرة؟ اعمل حساب جديد";F.querySelector("p").textContent=up?"اعمل حساب جديد بإيميلك (كلمة السر ٦ حروف على الأقل)":"سجّل دخولك عشان تفتح البرنامج";ER.textContent="";ER.style.color=""};
     SW.onclick=e=>{e.preventDefault();up=!up;mode()};
-    F.querySelector(".lg-demo").onclick=()=>{w.remove();demo()};
+    const D=F.querySelector(".lg-demo");
+    if(trialLeft()===0){D.textContent="الفترة التجريبية خلصت";D.disabled=true;ER.innerHTML='الـ ٣ أيام التجريبية خلصوا. عشان تكمل <a href="https://wa.me/201044574190?text=%D8%B9%D8%A7%D9%88%D8%B2%20%D8%A3%D8%B4%D8%AA%D8%B1%D9%83%20%D9%81%D9%8A%20%D8%B3%D9%86%D8%A7%D9%85" target="_blank" rel="noopener" style="color:#16a37b;font-weight:800">كلمنا على واتساب</a>'}
+    D.onclick=()=>{try{if(!localStorage.getItem(TK))localStorage.setItem(TK,String(Date.now()));localStorage.setItem(TK+"-on","1")}catch(e){}w.remove();demo()};
     F.onsubmit=async ev=>{ev.preventDefault();B.disabled=true;B.textContent="لحظة…";ER.textContent="";ER.style.color="";
       const cred={email:F.e.value.trim(),password:F.p.value};
       const{data,error}=up?await sb.auth.signUp(cred):await sb.auth.signInWithPassword(cred);
@@ -559,9 +561,14 @@ window.SANAM_CFG={url:"https://lhamdnaxioxqptkylvkg.supabase.co",key:"eyJhbGciOi
       if(up&&!data.session){up=false;mode();ER.style.color="#16a37b";ER.textContent="اتعمل الحساب. افتح الإيميل ودوس على رابط التأكيد، وبعدين ادخل من هنا.";return}
       me=data.user;w.remove();signedIn()}}
   // demo entry: sample company in memory only, nothing goes to Supabase
-  function demo(){window.SANAM_DEMO=true;try{history.replaceState(null,"","?demo=1"+location.hash)}catch(e){}signedIn()}
+  const TK="sanam-trial-start",DAY=864e5;
+  function trialLeft(){let t=0;try{t=+localStorage.getItem(TK)||0}catch(e){}if(!t)return 3;return Math.max(0,Math.ceil((t+3*DAY-Date.now())/DAY))}
+  window.sanamTrialLeft=trialLeft;
+  function demo(){window.SANAM_DEMO=true;signedIn()}
   async function start(){
-    if(new URLSearchParams(location.search).has("demo")){demo();return}
+    let on=false;try{on=localStorage.getItem(TK+"-on")==="1"}catch(e){}
+    if(on&&trialLeft()>0){demo();return}
+    if(on){try{localStorage.removeItem(TK+"-on")}catch(e){}}
     if(!window.supabase||cfg.url.startsWith("__")){loginBox("البرنامج لسه ما اتربطش بـ Supabase.");return}
     sb=window.supabase.createClient(cfg.url,cfg.key);
     // open straight away with the saved session; supabase refreshes the token in the background
@@ -767,8 +774,9 @@ new MutationObserver(()=>{if($("#modalRoot").firstElementChild&&!modalPushed){mo
 /* ---------- views ---------- */
 function pageH(text,actions){return `<div class="page-h"><p>${text||""}</p><div class="row">${actions||""}</div></div>`}
 function banner(){
+  if(window.SANAM_DEMO){const d=window.sanamTrialLeft();return `<div class="banner slim"><span class="row" style="gap:8px">${I("sparkle")}<span><b>نسخة تجريبية</b> · فاضل ${d===1?"يوم واحد":d===2?"يومين":d+" أيام"} · البيانات محفوظة على الجهاز ده بس</span></span><button class="btn gold small" data-act="exit-trial">دخول بحسابي</button></div>`}
   if(S.loadErr)return `<div class="banner slim" style="background:#fdecec;border-color:#f3b4b4;color:#5a1a1a"><span class="row" style="gap:8px">${I("sparkle")}<span><b>مفيش اتصال بقاعدة البيانات</b> · اتأكد من النت، أو إن مشروع Supabase شغال</span></span><button class="btn small" data-act="reload">حاول تاني</button></div>`;
-  if(S.demo)return `<div class="banner slim"><span class="row" style="gap:8px">${I("sparkle")}<span><b>بيانات تجريبية</b>${S.view==="home"?" لشركة وهمية عشان تشوف البرنامج. اللي تضيفه هنا مش بيتحفظ.":" · مش بتتحفظ"}</span></span><button class="btn gold small" data-act="exit-demo">${window.SANAM_DEMO?"دخول بحسابي":"ابدأ ببياناتي"}</button></div>`;
+  if(S.demo)return `<div class="banner slim"><span class="row" style="gap:8px">${I("sparkle")}<span><b>بيانات تجريبية</b>${S.view==="home"?" لشركة وهمية عشان تشوف البرنامج. اللي تضيفه هنا مش بيتحفظ.":" · مش بتتحفظ"}</span></span><button class="btn gold small" data-act="exit-demo">ابدأ ببياناتي</button></div>`;
   if(S.mode==="local")return `<div class="banner"><span>البيانات بتتحفظ على المتصفح ده بس. افتح البرنامج من لينك Claude عشان تتحفظ أونلاين وتفتحها من أي جهاز.</span></div>`;
   if(!S.canWrite)return `<div class="banner"><span>معاك صلاحية عرض بس، مش هتقدر تضيف أو تعدل.</span></div>`;
   return "";
@@ -1468,7 +1476,7 @@ function demoData(){
 }
 
 // with no records yet, open on the sample company so the first view shows a working app
-function maybeDemo(){if(window.SANAM_DEMO){S.saved=null;S.data=demoData();S.demo=true;return}if(!window.SANAM_CFG&&COLS.every(c=>!S.data[c].length)){S.saved=S.data;S.data=demoData();S.demo=true}}
+function maybeDemo(){if(window.SANAM_DEMO){if(COLS.every(c=>!S.data[c].length)){S.data=demoData();lsSave()}return}if(!window.SANAM_CFG&&COLS.every(c=>!S.data[c].length)){S.saved=S.data;S.data=demoData();S.demo=true}}
 
 /* ---------- events ---------- */
 document.addEventListener("click",e=>{
@@ -1500,7 +1508,7 @@ document.addEventListener("click",e=>{
   if(a==="del-line"){const ls=document.querySelectorAll("#m-lines .line");if(ls.length>1)b.closest(".line").remove();updInvoice();return}
   if(a==="do-del"){const{col,id}=ds;closeModal();del(col,id).then(()=>toast("اتحذف")).catch(()=>toast("الحذف ماتمش. ممكن صلاحيتك عرض بس."));return}
   if(a==="demo"){S.saved=S.data;S.data=demoData();S.demo=true;render();toast("دي بيانات تجريبية");return}
-  if(a==="exit-demo"&&window.SANAM_DEMO){location.href=location.pathname;return}
+  if(a==="exit-trial"){window.sanamLogout();return}
   if(a==="exit-demo"){S.data=S.saved||{projects:[],parties:[],accounts:[],employees:[],txns:[],reports:[]};S.saved=null;S.demo=false;S.f.dashProject="";go("home");return}
   if(a==="month"){const d=new Date();S.f.from=new Date(d.getFullYear(),d.getMonth(),1,12).toISOString().slice(0,10);S.f.to=today();render();return}
   if(a==="allrange"){S.f.from=S.f.to="";render();return}
