@@ -473,6 +473,11 @@ body{font-weight:500}
   .top .avatar{display:none}
   .content{padding:14px 12px 70px}
 }
+/* side tabs pinned in place while the page scrolls, sized to the visible screen (the .app zoom scales 100dvh) */
+.rail{position:fixed!important;top:0!important;right:0;bottom:0;height:calc(100dvh / 1.12)!important;width:250px!important;z-index:30;transform:none!important}
+.main{grid-column:2}
+@media (max-width:900px){.rail{width:84px!important;height:calc(100dvh / 1.08)!important}}
+@media print{.rail{display:none}}
 </style>
 </head>
 <body>
@@ -537,7 +542,11 @@ window.SANAM_CFG={url:"https://lhamdnaxioxqptkylvkg.supabase.co",key:"eyJhbGciOi
   const assets={upload:async blob=>{const path=me.id+"/"+new Date().toISOString().slice(0,7)+"/"+(crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random().toString(36).slice(2))+".jpg";
     const{error}=await sb.storage.from(cfg.bucket).upload(path,blob,{contentType:blob.type||"image/jpeg"});if(error)throw error;
     return{id:path,url:sb.storage.from(cfg.bucket).getPublicUrl(path).data.publicUrl}}};
-  window.sanamLogout=async()=>{if(window.SANAM_DEMO){try{localStorage.removeItem("sanam-trial-start-on")}catch(e){}location.href=location.pathname;return}try{localStorage.removeItem(ck())}catch(e){}await sb.auth.signOut();location.reload()};
+  window.sanamLogout=async()=>{if(window.SANAM_DEMO){try{localStorage.removeItem("sanam-trial-start-on")}catch(e){}location.href=location.pathname;return}try{localStorage.removeItem(ck())}catch(e){}
+    // sign out on this phone even when Supabase can't be reached
+    try{await sb.auth.signOut({scope:"local"})}catch(e){}
+    try{Object.keys(localStorage).filter(k=>/^sb-.*-auth-token$/.test(k)).forEach(k=>localStorage.removeItem(k))}catch(e){}
+    location.reload()};
   window.claude={use:async n=>{await ready;if(window.SANAM_DEMO)return n==="downloads"?downloads:null;return n==="db"?db:n==="user"?user:n==="downloads"?downloads:n==="assets"?assets:null}};
 
   function loginBox(msg){
