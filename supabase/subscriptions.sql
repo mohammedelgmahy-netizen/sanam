@@ -1,0 +1,7 @@
+-- Applied on top of schema.sql as migration "sanam_subscriptions" (2026-11-24).
+-- Each company is a subscriber: active flag, expiry date, user limit. A stopped or
+-- expired company reaches none of its data (sanam_private.company() returns null),
+-- but the data stays saved. The app owner (public.sanam_owners) manages companies
+-- through sanam_owner_companies / sanam_owner_set and the sanam-users edge function
+-- (owner_create_company, owner_password). Self sign-up no longer creates a company.
+-- Full SQL: see the migration in the Supabase project (list_migrations).

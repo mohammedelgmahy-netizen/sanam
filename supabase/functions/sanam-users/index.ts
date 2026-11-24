@@ -20,10 +20,38 @@ Deno.serve(async (req) => {
     const jwt = (req.headers.get("Authorization") || "").replace("Bearer ", "");
     const { data: who } = await admin.auth.getUser(jwt);
     if (!who?.user) return reply({ error: "سجل دخول الأول" }, 401);
+    const b = await req.json();
+    const { data: own } = await admin.from("sanam_owners").select("user_id").eq("user_id", who.user.id).maybeSingle();
+
+    // ---- app owner: open a company for a new subscriber, reset its admin's password ----
+    if (b.action === "owner_create_company" || b.action === "owner_password") {
+      if (!own) return reply({ error: "الشاشة دي لصاحب البرنامج بس" }, 403);
+      if (b.action === "owner_password") {
+        if (String(b.password || "").length < 8) return reply({ error: "كلمة السر لازم تكون ٨ حروف على الأقل" }, 400);
+        // only Sanam company accounts, never other apps' users in this project
+        const { data: mem } = await admin.from("sanam_members").select("user_id").eq("user_id", b.user_id).maybeSingle();
+        if (!mem) return reply({ error: "المستخدم ده مش موجود" }, 404);
+        const { error } = await admin.auth.admin.updateUserById(b.user_id, { password: b.password });
+        return error ? reply({ error: error.message }, 400) : reply({ ok: true });
+      }
+      const username = String(b.username || "").trim().toLowerCase();
+      if (!String(b.company_name || "").trim()) return reply({ error: "اكتب اسم الشركة" }, 400);
+      if (!USER_RE.test(username)) return reply({ error: "اسم المستخدم لازم يكون بالإنجليزي أو أرقام، من ٣ لـ ٣٠ حرف، من غير مسافات" }, 400);
+      if (String(b.password || "").length < 8) return reply({ error: "كلمة السر لازم تكون ٨ حروف على الأقل" }, 400);
+      const { data: made, error } = await admin.auth.admin.createUser({ email: toEmail(username), password: b.password, email_confirm: true });
+      if (error) return reply({ error: /registered|exists/i.test(error.message) ? "اسم المستخدم ده موجود قبل كده" : error.message }, 400);
+      const { data: co, error: e1 } = await admin.from("sanam_companies").insert({ name: String(b.company_name).trim(), created_by: made.user.id, active: true,
+        expires_on: b.expires_on || null, max_users: b.max_users ? Number(b.max_users) : null, phone: b.phone || null, notes: b.notes || null }).select().single();
+      if (e1) { await admin.auth.admin.deleteUser(made.user.id); return reply({ error: e1.message }, 400); }
+      const { error: e2 } = await admin.from("sanam_members").insert({ company_id: co.id, user_id: made.user.id, username, is_admin: true, permissions: {} });
+      if (e2) { await admin.from("sanam_companies").delete().eq("id", co.id); await admin.auth.admin.deleteUser(made.user.id); return reply({ error: e2.message }, 400); }
+      return reply({ ok: true, company_id: co.id });
+    }
+
     const { data: me } = await admin.from("sanam_members").select("*").eq("user_id", who.user.id).maybeSingle();
     if (!me || !me.is_admin || !me.active) return reply({ error: "الشاشة دي للمدير بس" }, 403);
-
-    const b = await req.json();
+    const { data: co } = await admin.from("sanam_companies").select("active,expires_on,max_users").eq("id", me.company_id).single();
+    if (!co.active || (co.expires_on && co.expires_on < new Date().toISOString().slice(0, 10))) return reply({ error: "اشتراك الشركة متوقف" }, 403);
     const fields = (x: any) => ({
       is_admin: !!x.is_admin,
       active: x.active !== false,
@@ -41,6 +69,10 @@ Deno.serve(async (req) => {
       const username = String(b.username || "").trim().toLowerCase();
       if (!USER_RE.test(username)) return reply({ error: "اسم المستخدم لازم يكون بالإنجليزي أو أرقام، من ٣ لـ ٣٠ حرف، من غير مسافات" }, 400);
       if (String(b.password || "").length < 8) return reply({ error: "كلمة السر لازم تكون ٨ حروف على الأقل" }, 400);
+      if (co.max_users) {
+        const { count } = await admin.from("sanam_members").select("user_id", { count: "exact", head: true }).eq("company_id", me.company_id);
+        if ((count || 0) >= co.max_users) return reply({ error: "اشتراكك بيسمح بـ " + co.max_users + " مستخدمين بس. كلم الدعم لو عاوز تزود." }, 400);
+      }
       const { data: made, error } = await admin.auth.admin.createUser({ email: toEmail(username), password: b.password, email_confirm: true });
       if (error) return reply({ error: /registered|exists/i.test(error.message) ? "اسم المستخدم ده موجود قبل كده" : error.message }, 400);
       const { error: e2 } = await admin.from("sanam_members").insert({ company_id: me.company_id, user_id: made.user.id, username, ...fields(b) });

@@ -519,7 +519,7 @@ window.SANAM_CFG={url:"https://lhamdnaxioxqptkylvkg.supabase.co",key:"eyJhbGciOi
   const sk=()=>"sanam-ses-"+(me&&me.id);
   function session(){return sesP||(sesP=(async()=>{let c=null;try{c=JSON.parse(localStorage.getItem(sk())||"null")}catch(e){}
     const fresh=sb.rpc("sanam_session").then(({data,error})=>{if(error)throw error;SES=data;window.SANAM_SES=data;try{localStorage.setItem(sk(),JSON.stringify(data))}catch(e){}return data});
-    if(c&&c.company_id){SES=c;window.SANAM_SES=c;fresh.catch(()=>{});return c}
+    if(c&&c.company_id){SES=c;window.SANAM_SES=c;fresh.then(d=>{if(d&&(d.no_company||d.company_ok!==c.company_ok||d.active!==c.active||d.is_admin!==c.is_admin||JSON.stringify(d.permissions)!==JSON.stringify(c.permissions)))location.reload()}).catch(()=>{});return c}
     return fresh})())}
   const pendingFor=c=>(c==="txns"||c==="reports")&&SES&&!SES.is_admin&&SES.requires_approval;
   let live=false;
@@ -554,6 +554,9 @@ window.SANAM_CFG={url:"https://lhamdnaxioxqptkylvkg.supabase.co",key:"eyJhbGciOi
     if(error){let m=error.message;try{const j=await error.context.json();m=j.error||m}catch(e){}throw new Error(m)}if(data&&data.error)throw new Error(data.error);return data};
   window.sanamApprove=async(c,id,ok)=>{const{error}=await sb.rpc("sanam_approve",{p_collection:c,p_id:id,p_ok:ok});if(error)throw error;
     const x=C(c),r=x.map.get(id);if(ok&&r){const d={...r.data};delete d.pending;x.map.set(id,{id,data:d})}else x.map.delete(id);emit(c);saveCache()};
+  window.sanamOwner={list:async()=>{const{data,error}=await sb.rpc("sanam_owner_companies");if(error)throw error;return data||[]},
+    set:async c=>{const{error}=await sb.rpc("sanam_owner_set",{p_id:c.id,p_name:c.name,p_active:!!c.active,p_expires_on:c.expires_on||null,p_max_users:c.max_users||null,p_phone:c.phone||null,p_notes:c.notes||null});if(error)throw error},
+    create:b=>window.sanamAdmin({action:"owner_create_company",...b}),password:(user_id,password)=>window.sanamAdmin({action:"owner_password",user_id,password})};
   window.sanamLogout=async()=>{if(window.SANAM_DEMO){try{localStorage.removeItem("sanam-trial-start-on")}catch(e){}location.href=location.pathname;return}try{localStorage.removeItem(ck());localStorage.removeItem(sk())}catch(e){}
     // sign out on this phone even when Supabase can't be reached
     try{await sb.auth.signOut({scope:"local"})}catch(e){}
@@ -566,7 +569,7 @@ window.SANAM_CFG={url:"https://lhamdnaxioxqptkylvkg.supabase.co",key:"eyJhbGciOi
     w.innerHTML=`<form><div class="lg-logo" style="background:none;overflow:hidden"><img src="icon-192.png" alt="" style="width:100%;height:100%"></div><h2>سنام للمقاولات</h2><p>سجّل دخولك عشان تفتح البرنامج</p>
       <label>اسم المستخدم أو الإيميل<input type="text" name="e" autocomplete="username" autocapitalize="none" spellcheck="false" dir="ltr" required></label>
       <label>كلمة السر<input type="password" name="p" autocomplete="current-password" required></label>
-      <div class="lg-err">${msg||""}</div><button type="submit">دخول</button><a href="#" class="lg-sw">أول مرة؟ اعمل حساب جديد</a><div class="lg-or">أو</div><button type="button" class="lg-demo">دخول تجريبي لمدة ٣ أيام</button></form>`;
+      <div class="lg-err">${msg||""}</div><button type="submit">دخول</button><a href="#" class="lg-sw" hidden>أول مرة؟ اعمل حساب جديد</a><a class="lg-sw" href="https://wa.me/201044574190?text=%D8%B9%D8%A7%D9%88%D8%B2%20%D8%A3%D8%B4%D8%AA%D8%B1%D9%83%20%D9%81%D9%8A%20%D8%B3%D9%86%D8%A7%D9%85%20%D9%84%D9%84%D9%85%D9%82%D8%A7%D9%88%D9%84%D8%A7%D8%AA" target="_blank" rel="noopener">شركتك لسه مش مشتركة؟ كلمنا على واتساب</a><div class="lg-or">أو</div><button type="button" class="lg-demo">دخول تجريبي لمدة ٣ أيام</button></form>`;
     document.body.appendChild(w);
     let up=false;const F=w.querySelector("form"),B=F.querySelector("button"),ER=F.querySelector(".lg-err"),SW=F.querySelector(".lg-sw");
     const mode=()=>{B.textContent=up?"إنشاء الحساب":"دخول";SW.textContent=up?"عندي حساب، رجوع للدخول":"أول مرة؟ اعمل حساب جديد";F.querySelector("p").textContent=up?"اعمل حساب جديد بإيميلك (كلمة السر ٦ حروف على الأقل)":"سجّل دخولك عشان تفتح البرنامج";ER.textContent="";ER.style.color=""};
@@ -650,7 +653,8 @@ const VIEWS=[
   {id:"ledger",label:"دفتر الخزنة",group:"التقارير"},
   {id:"statement",label:"كشف حساب",group:"التقارير"},
   {id:"backup",label:"نسخة احتياطية",group:"أدوات"},
-  {id:"users",label:"المستخدمين والصلاحيات",group:"أدوات"}
+  {id:"users",label:"المستخدمين والصلاحيات",group:"أدوات"},
+  {id:"owner",label:"الشركات المشتركة",group:"صاحب البرنامج"}
 ];
 
 /* ---------- state ---------- */
@@ -659,7 +663,7 @@ const S={data:{projects:[],parties:[],accounts:[],employees:[],txns:[],reports:[
 let db=null,downloads=null,assets=null;
 
 /* ---------- users & permissions (same rules the database enforces) ---------- */
-const PERM={admin:true,perms:{},approval:false,user:""};
+const PERM={admin:true,perms:{},approval:false,user:"",owner:false};
 const PG=[
   {g:"تسجيل يومي",tabs:[["invoice","فواتير التوريد"],["expense","المصروفات"],["statement","مستخلصات وتحصيل العملاء"],["subwork","مقاولين الباطن ودفعات الموردين"],["transfer","التحويل بين الخزن"],["payroll","المرتبات والسلف"],["site","تقارير الموقع"]]},
   {g:"تقارير ودفاتر",ro:1,tabs:[["home","الرئيسية"],["income","قائمة الدخل"],["compare","مقارنة المشاريع"],["ledger","دفتر الخزنة"],["accstmt","كشف حساب"]]},
@@ -670,7 +674,7 @@ const VIEW_TAB={home:"home",site:"site",payroll:"payroll",projects:"projects",pa
 const permTab=(col,r)=>col==="txns"?(TX_TAB[typeof r==="string"?r:r&&r.kind]||"daily"):col==="reports"?"site":col;
 const can=(tab,act)=>PERM.admin||!!(PERM.perms[tab]&&PERM.perms[tab][act]);
 function canDo(col,r,act){if(PERM.admin)return true;if(PERM.approval&&(col==="txns"||col==="reports")&&r&&typeof r==="object"&&!r.pending)return false;return can(permTab(col,r),act)}
-function viewOk(id){if(id==="users")return PERM.admin&&S.mode==="db"&&!S.demo&&!window.SANAM_DEMO;if(PERM.admin)return true;
+function viewOk(id){if(id==="owner")return !!PERM.owner&&S.mode==="db"&&!S.demo&&!window.SANAM_DEMO;if(id==="users")return PERM.admin&&S.mode==="db"&&!S.demo&&!window.SANAM_DEMO;if(PERM.admin)return true;
   if(id==="daily")return Object.values(TX_TAB).some(t=>can(t,"view"));if(id==="dash")id="home";return can(VIEW_TAB[id]||id,"view")}
 function ED(col,id){const r=byId(col,id);return (canDo(col,r,"edit")?`<button class="icon-btn" data-edit="${col}" data-id="${id}" aria-label="تعديل" title="تعديل">${I("edit")}</button>`:"")+(canDo(col,r,"delete")?`<button class="icon-btn del" data-del="${col}" data-id="${id}" aria-label="حذف" title="حذف">${I("trash")}</button>`:"")}
 
@@ -770,6 +774,7 @@ const IC={
   upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
   pin:'<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>'
 };
+IC.users=IC.users||IC.employees;IC.owner=IC.owner||IC.projects;
 const I=(n,cls)=>`<svg class="i ${cls||""}" viewBox="0 0 24 24" aria-hidden="true">${IC[n]||""}</svg>`;
 const monthName=m=>{if(!m)return"";const[y,mm]=m.split("-");return (MONTHS[+mm-1]||"")+" "+y};
 const TXS={salary:{ic:"payroll",tone:"violet"},advance:{ic:"hand",tone:"amber"},invoice:{ic:"receipt",tone:"blue"},expense:{ic:"cash",tone:"amber"},statement:{ic:"statement",tone:"violet"},collection:{ic:"in",tone:"green"},subwork:{ic:"hat",tone:"amber"},payment:{ic:"out",tone:"red"},transfer:{ic:"swap",tone:"blue"}};
@@ -792,7 +797,7 @@ function renderNav(){
   $("#nav").innerHTML=h;
   const ft=S.demo?["warn","بيانات تجريبية (مش محفوظة)"]:S.mode==="db"?["","متصل · البيانات محفوظة أونلاين"]:["warn","محفوظ على الجهاز ده بس"];
   $("#railFoot").innerHTML=`<span class="dot ${ft[0]}"></span><span class="lbl">${ft[1]}</span>`;$("#railFoot").title=ft[1];
-  const v=VIEWS.find(x=>x.id===S.view)||VIEWS[0];$("#pageTitle").textContent=v.label;$("#backBtn").hidden=S.view==="home";$("#homeBtn").hidden=S.view==="home";$("#pageCrumb").textContent="سنام للمقاولات · "+v.group;
+  const v=VIEWS.find(x=>x.id===S.view)||VIEWS[0];$("#pageTitle").textContent=v.label;$("#backBtn").hidden=S.view==="home";$("#homeBtn").hidden=S.view==="home";$("#pageCrumb").textContent=(S.company||"سنام للمقاولات")+" · "+v.group;
 }
 /* Phone back button / edge swipe: the drawer and every dialog get a history entry, so "back" closes the dialog, then the drawer; from any screen one back goes straight to home (extra screen entries are skipped). */
 let depth=0,ignorePop=false,fromPop=false,modalPushed=false,navPushed=false;
@@ -811,7 +816,8 @@ new MutationObserver(()=>{if($("#modalRoot").firstElementChild&&!modalPushed){mo
 
 /* ---------- views ---------- */
 function pageH(text,actions){return `<div class="page-h"><p>${text||""}</p><div class="row">${actions||""}</div></div>`}
-function banner(){
+function banner(){return subBanner()+banner0()}
+function banner0(){
   if(window.SANAM_DEMO){const d=window.sanamTrialLeft();return `<div class="banner slim"><span class="row" style="gap:8px">${I("sparkle")}<span><b>نسخة تجريبية</b> · فاضل ${d===1?"يوم واحد":d===2?"يومين":d+" أيام"} · البيانات محفوظة على الجهاز ده بس</span></span><button class="btn gold small" data-act="exit-trial">دخول بحسابي</button></div>`}
   if(S.loadErr)return `<div class="banner slim" style="background:#fdecec;border-color:#f3b4b4;color:#5a1a1a"><span class="row" style="gap:8px">${I("sparkle")}<span><b>مفيش اتصال بقاعدة البيانات</b> · اتأكد من النت، أو إن مشروع Supabase شغال</span></span><button class="btn small" data-act="reload">حاول تاني</button></div>`;
   if(S.demo)return `<div class="banner slim"><span class="row" style="gap:8px">${I("sparkle")}<span><b>بيانات تجريبية</b>${S.view==="home"?" لشركة وهمية عشان تشوف البرنامج. اللي تضيفه هنا مش بيتحفظ.":" · مش بتتحفظ"}</span></span><button class="btn gold small" data-act="exit-demo">ابدأ ببياناتي</button></div>`;
@@ -1388,7 +1394,85 @@ document.addEventListener("submit",async e=>{
   catch(x){btn.disabled=false;err.textContent=x.message||"ماتحفظش"}
 });
 
-const RENDER={site:viewSite,home:viewDash,dash:viewDash,employees:viewEmployees,payroll:viewPayroll,income:viewIncome,dash:viewDash,daily:viewDaily,projects:viewProjects,parties:viewParties,accounts:viewAccounts,compare:viewCompare,ledger:viewLedger,statement:viewStatement,backup:viewBackup,users:viewUsers};
+/* ---------- app owner: subscriber companies ---------- */
+const WA_SUPPORT="https://wa.me/201044574190?text="+encodeURIComponent("عاوز أجدد اشتراك سنام للمقاولات");
+function subBlocked(ss){S.mode="db";const exp=ss.expires_on&&ss.company_active!==false;
+  $("#main").innerHTML=emptyBox("backup",exp?"اشتراك الشركة خلص":"اشتراك الشركة متوقف",(exp?"الاشتراك انتهى يوم "+fmtDate(ss.expires_on)+". ":"")+"بياناتك كلها محفوظة، وهترجع أول ما الاشتراك يتجدد.")+
+  `<div class="row" style="justify-content:center;margin-top:14px;gap:10px"><a class="btn primary" href="${WA_SUPPORT}" target="_blank" rel="noopener">${I("whatsapp")}جدد الاشتراك على واتساب</a><button class="btn" data-act="logout">تسجيل خروج</button></div>`}
+function noCompany(){S.mode="db";$("#main").innerHTML=emptyBox("users","الحساب ده مش مربوط بشركة","البرنامج بالاشتراك. كلمنا على واتساب ونفتحلك حساب لشركتك.")+
+  `<div class="row" style="justify-content:center;margin-top:14px;gap:10px"><a class="btn primary" href="https://wa.me/201044574190?text=${encodeURIComponent("عاوز أشترك في سنام للمقاولات")}" target="_blank" rel="noopener">${I("whatsapp")}اشترك على واتساب</a><button class="btn" data-act="logout">تسجيل خروج</button></div>`}
+function subBanner(){const e=S.expiresOn;if(!e||window.SANAM_DEMO)return "";const d=Math.ceil((new Date(e+"T23:59:59")-Date.now())/864e5);if(d>7)return "";
+  return `<div class="banner slim"><span><b>اشتراك الشركة بيخلص ${d<=0?"النهارده":d===1?"بكرة":"بعد "+d+" أيام"}</b> (${fmtDate(e)}). جدده عشان البرنامج ما يقفش.</span><a class="btn gold small" href="${WA_SUPPORT}" target="_blank" rel="noopener">جدد الاشتراك</a></div>`}
+const addMonths=(n,from)=>{const b=from&&from>=today()?new Date(from+"T12:00:00"):new Date();b.setMonth(b.getMonth()+n);return b.toISOString().slice(0,10)};
+function coState(c){if(!c.active)return["t-red","متوقفة"];if(c.expires_on&&c.expires_on<today())return["t-red","منتهية"];
+  if(c.expires_on){const d=Math.ceil((new Date(c.expires_on+"T23:59:59")-Date.now())/864e5);if(d<=7)return["t-amber","فاضل "+d+" يوم"]}return["t-green","شغالة"]}
+function loadCos(){if(S.cosLoading)return;S.cosLoading=true;window.sanamOwner.list().then(c=>{S.cos=c;S.cosErr=""}).catch(e=>{S.cosErr=e.message||"تعذر التحميل"}).finally(()=>{S.cosLoading=false;render()})}
+function viewOwner(){
+  if(!S.cos&&!S.cosErr){loadCos();return pageH("بتحمّل الشركات…")}
+  const cs=S.cos||[];const n=f=>cs.filter(f).length;
+  const kp=(ic,t,l,v)=>`<div class="card kpi"><div class="kpi-top"><span class="kpi-ic ${t}">${I(ic)}</span><div><div class="l">${l}</div><div class="v"><span class="num">${v}</span></div></div></div></div>`;
+  return pageH("كل شركة مشتركة في سنام للمقاولات ليها بياناتها لوحدها. من هنا تفتح شركة جديدة، وتجدد أو توقف اشتراكها.",`<button class="btn primary" data-act="co-add">${I("plus")}شركة جديدة</button>`)+
+  (S.cosErr?`<div class="banner slim" style="background:#fdecec;color:#5a1a1a"><span>${esc(S.cosErr)}</span><button class="btn small" data-act="co-reload">حاول تاني</button></div>`:"")+
+  `<div class="kpis">${kp("projects","t-blue","كل الشركات",cs.length)}${kp("check","t-green","شغالة",n(c=>coState(c)[1]==="شغالة"||coState(c)[0]==="t-amber"))}${kp("sparkle","t-amber","بتخلص خلال أسبوع",n(c=>coState(c)[0]==="t-amber"))}${kp("x","t-red","منتهية أو متوقفة",n(c=>coState(c)[0]==="t-red"))}</div>`+
+  `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>الشركة</th><th>المدير</th><th>التليفون</th><th class="n">المستخدمين</th><th class="n">السجلات</th><th>آخر نشاط</th><th>ينتهي في</th><th>الحالة</th><th></th></tr></thead><tbody>${cs.map(c=>{const s=coState(c);return `<tr>
+    <td>${ava(c.name,c.mine?"شركتك":"")}</td><td dir="ltr" style="text-align:right">${esc(nameU(c.admin||"—"))}</td><td class="num">${esc(c.phone||"—")}</td>
+    <td class="n num">${c.users}${c.max_users?" / "+c.max_users:""}</td><td class="n num">${c.records}</td><td class="num muted">${c.last_activity?esc(fmtDate(c.last_activity.slice(0,10))):"—"}</td>
+    <td class="num">${c.expires_on?esc(fmtDate(c.expires_on)):"مفتوح"}</td><td><span class="pill ${s[0]}">${s[1]}</span></td>
+    <td class="acts"><div class="row" style="flex-wrap:nowrap;gap:6px"><button class="icon-btn" data-act="co-edit" data-id="${c.id}" aria-label="تعديل" title="تعديل وتجديد">${I("edit")}</button>${c.mine?"":`<button class="btn small" data-act="co-toggle" data-id="${c.id}">${c.active?"إيقاف":"تفعيل"}</button>`}${c.admin_id&&!c.mine?`<button class="btn small" data-act="co-pass" data-id="${c.id}">كلمة سر المدير</button>`:""}</div></td></tr>`}).join("")}</tbody></table></div></div>`;
+}
+function coForm(c){
+  const v=k=>esc(c?c[k]??"":"");
+  $("#modalRoot").innerHTML=`<div class="scrim" data-act="close-scrim"><form class="modal" id="coform" role="dialog" aria-modal="true" style="width:min(600px,100%)" data-id="${c?c.id:""}"><div class="modal-h"><span class="kpi-ic t-blue" style="width:40px;height:40px">${I("projects")}</span><h3>${c?"تعديل "+esc(c.name):"شركة جديدة"}</h3><button type="button" class="icon-btn" data-act="close" aria-label="إغلاق">${I("x")}</button></div>
+  <div class="modal-b"><div class="form">
+    ${fld("اسم الشركة",`<input id="co-name" value="${v("name")}" placeholder="شركة النور للمقاولات">`,{req:1})}
+    ${fld("تليفون الشركة (واتساب)",`<input id="co-phone" type="tel" dir="ltr" value="${v("phone")}" placeholder="01xxxxxxxxx">`)}
+    ${c?"":fld("اسم مستخدم المدير (إنجليزي)",`<input id="co-user" dir="ltr" autocapitalize="none" spellcheck="false" placeholder="alnour">`,{req:1})+fld("كلمة سر المدير (٨ حروف على الأقل)",`<input id="co-pass" type="text" dir="ltr" value="${Math.random().toString(36).slice(2,10)}">`,{req:1})}
+    ${fld("الاشتراك ينتهي يوم (فاضي = مفتوح)",`<input id="co-exp" type="date" value="${c?v("expires_on"):addMonths(1)}">`)}
+    <div class="row" style="gap:6px;align-items:end;flex-wrap:wrap"><button type="button" class="btn small" data-act="co-plus" data-m="1">+ شهر</button><button type="button" class="btn small" data-act="co-plus" data-m="3">+ ٣ شهور</button><button type="button" class="btn small" data-act="co-plus" data-m="12">+ سنة</button></div>
+    ${fld("أقصى عدد مستخدمين (فاضي = مفتوح)",`<input id="co-max" type="number" min="1" inputmode="numeric" value="${v("max_users")}">`)}
+    ${c?`<label class="full" style="flex-direction:row;align-items:center;gap:10px"><input type="checkbox" id="co-active" ${c.active?"checked":""} ${c.mine?"disabled":""} style="width:20px;height:20px"><span>الاشتراك شغال</span></label>`:""}
+    ${fld("ملاحظات (السعر، طريقة الدفع…)",`<input id="co-notes" value="${v("notes")}">`,{full:1})}
+  </div><div class="err" id="co-err"></div></div>
+  <div class="modal-f"><button class="btn primary" type="submit">${I("check")}${c?"حفظ":"افتح الشركة"}</button><button class="btn" type="button" data-act="close">إلغاء</button></div></form></div>`;
+}
+function credsBox(name,user,pass,phone){
+  const link=location.origin+location.pathname;
+  const txt=`أهلا بيكم في سنام للمقاولات\nشركة: ${name}\nاللينك: ${link}\nاسم المستخدم: ${user}\nكلمة السر: ${pass}\nبعد ما تدخل تقدر تضيف الموظفين وتحدد صلاحياتهم من «المستخدمين والصلاحيات».`;
+  const ph=waPhone(phone);
+  $("#modalRoot").innerHTML=`<div class="scrim" data-act="close-scrim"><div class="modal" role="dialog" aria-modal="true" style="width:min(520px,100%)"><div class="modal-h"><span class="kpi-ic t-green" style="width:40px;height:40px">${I("check")}</span><h3>الشركة اتفتحت</h3></div>
+  <div class="modal-b"><p style="margin:0 0 8px">ابعت البيانات دي لمدير الشركة:</p><textarea readonly rows="7" style="width:100%;font:inherit">${esc(txt)}</textarea></div>
+  <div class="modal-f"><a class="btn primary" target="_blank" rel="noopener" href="https://wa.me/${ph}?text=${encodeURIComponent(txt)}">${I("whatsapp")}ابعت على واتساب</a><button class="btn" data-act="close">تمام</button></div></div></div>`;
+}
+function ownerAct(a,ds,b){
+  const find=id=>(S.cos||[]).find(c=>c.id===id);
+  if(a==="co-add"){coForm(null);return true}
+  if(a==="co-reload"){S.cosErr="";S.cos=null;render();return true}
+  if(a==="co-edit"){const c=find(ds.id);c&&coForm(c);return true}
+  if(a==="co-plus"){const e=$("#co-exp");e.value=addMonths(+ds.m,$("#coform").dataset.id?e.value:"");return true}
+  if(a==="co-toggle"){const c=find(ds.id);if(!c)return true;if(c.active&&!confirm("إيقاف اشتراك "+c.name+"؟ مش هيقدروا يدخلوا، والبيانات هتفضل محفوظة."))return true;b.disabled=true;
+    window.sanamOwner.set({...c,active:!c.active}).then(()=>{toast(c.active?"اتوقفت":"اتفعّلت");S.cos=null;render()}).catch(e=>{b.disabled=false;toast(e.message)});return true}
+  if(a==="co-pass"){const c=find(ds.id);if(!c)return true;const p=prompt("كلمة سر جديدة لمدير "+c.name+" (٨ حروف على الأقل):",Math.random().toString(36).slice(2,10));if(!p)return true;
+    if(p.length<8){toast("كلمة السر لازم تكون ٨ حروف على الأقل");return true}
+    window.sanamOwner.password(c.admin_id,p).then(()=>credsBox(c.name,nameU(c.admin),p,c.phone)).catch(e=>toast(e.message));return true}
+  return false;
+}
+document.addEventListener("submit",async e=>{
+  if(e.target.id!=="coform")return;e.preventDefault();
+  const id=e.target.dataset.id,err=$("#co-err"),btn=e.target.querySelector('[type="submit"]');err.textContent="";
+  const f={name:$("#co-name").value.trim(),phone:$("#co-phone").value.trim(),expires_on:$("#co-exp").value||null,max_users:$("#co-max").value?+$("#co-max").value:null,notes:$("#co-notes").value.trim()};
+  if(!f.name){err.textContent="اكتب اسم الشركة";return}
+  btn.disabled=true;
+  try{
+    if(id){const c=(S.cos||[]).find(x=>x.id===id);await window.sanamOwner.set({...c,...f,active:$("#co-active").checked});closeModal();toast("اتحفظ")}
+    else{const u=$("#co-user").value.trim().toLowerCase(),p=$("#co-pass").value;
+      if(!/^[a-z0-9._-]{3,30}$/.test(u))throw new Error("اسم المستخدم لازم يكون بالإنجليزي أو أرقام، من ٣ حروف، من غير مسافات");
+      if(p.length<8)throw new Error("كلمة السر لازم تكون ٨ حروف على الأقل");
+      await window.sanamOwner.create({company_name:f.name,username:u,password:p,expires_on:f.expires_on,max_users:f.max_users,phone:f.phone,notes:f.notes});credsBox(f.name,u,p,f.phone)}
+    S.cos=null;render()}
+  catch(x){btn.disabled=false;err.textContent=x.message||"ماتحفظش"}
+});
+
+const RENDER={site:viewSite,home:viewDash,dash:viewDash,employees:viewEmployees,payroll:viewPayroll,income:viewIncome,dash:viewDash,daily:viewDaily,projects:viewProjects,parties:viewParties,accounts:viewAccounts,compare:viewCompare,ledger:viewLedger,statement:viewStatement,backup:viewBackup,users:viewUsers,owner:viewOwner};
 function render(){
   if(S.mode==="loading")return;
   renderNav();
@@ -1613,7 +1697,7 @@ document.addEventListener("click",e=>{
   if(ds.ledger){S.f.ledgerAcc=ds.ledger;go("ledger");return}
   if(ds.chip){S.f[ds.chip]=ds.v;render();return}
   const a=ds.act;if(!a)return;
-  if(userAct(a,ds,b))return;
+  if(userAct(a,ds,b)||ownerAct(a,ds,b))return;
   if(a==="pay-all"){if(!S.data.accounts.length){toast("ضيف خزنة الأول");return}payAllForm();return}
   if(a==="pay-one"){const e=byId("employees",ds.emp);if(!e)return;const ad=Math.min(Math.max(0,advanceBalance(e.id)),N(e.salary));openForm("txns",null,"salary");$("#m-employeeId").value=e.id;$("#m-base").value=e.salary;$("#m-projectId").value=e.projectId||"";if(ad)$("#m-advanceDeduct").value=ad;updSalary();return}
   if(a==="logout"){if(confirm("تسجيل خروج من البرنامج؟"))window.sanamLogout();return}
@@ -1678,7 +1762,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&modalCtx)closeModal
     try{const w=u&&await u.can("data.write");if(w===false)S.canWrite=false}catch(e){}
     const got=new Set();let firstLoad=true;
     try{const me=u&&await u.me();if(me&&me.name)$("#avatar").textContent=initial(me.name);const ss=me&&me.session;
-      if(ss){if(ss.active===false){blocked();return}PERM.admin=!!ss.is_admin;PERM.perms=ss.permissions||{};PERM.approval=!!ss.requires_approval;PERM.user=ss.username||""}}catch(e){}
+      if(ss){if(ss.no_company){noCompany();return}if(ss.company_ok===false&&!ss.is_owner){subBlocked(ss);return}if(ss.active===false){blocked();return}PERM.owner=!!ss.is_owner;S.company=ss.company_name||"";S.expiresOn=ss.expires_on||"";if(S.company&&S.company!=="سنام للمقاولات"){const bs=$(".brand small");if(bs)bs.textContent=S.company}PERM.admin=!!ss.is_admin;PERM.perms=ss.permissions||{};PERM.approval=!!ss.requires_approval;PERM.user=ss.username||""}}catch(e){}
     COLS.forEach(c=>db.collection(c).onSnapshot(snap=>{
       const list=snap.docs.map(x=>({id:x.id,...x.data()}));got.add(c);
       // while the demo is showing, live data goes to the saved copy so the demo stays separate
