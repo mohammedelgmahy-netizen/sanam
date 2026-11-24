@@ -554,6 +554,8 @@ window.SANAM_CFG={url:"https://lhamdnaxioxqptkylvkg.supabase.co",key:"eyJhbGciOi
     if(error){let m=error.message;try{const j=await error.context.json();m=j.error||m}catch(e){}throw new Error(m)}if(data&&data.error)throw new Error(data.error);return data};
   window.sanamApprove=async(c,id,ok)=>{const{error}=await sb.rpc("sanam_approve",{p_collection:c,p_id:id,p_ok:ok});if(error)throw error;
     const x=C(c),r=x.map.get(id);if(ok&&r){const d={...r.data};delete d.pending;x.map.set(id,{id,data:d})}else x.map.delete(id);emit(c);saveCache()};
+  window.sanamCompany=async({name,logo})=>{await session();const{error}=await sb.from("sanam_companies").update({name,logo}).eq("id",SES.company_id);if(error)throw error;
+    SES.company_name=name;SES.logo=logo;try{localStorage.setItem(sk(),JSON.stringify(SES))}catch(e){}};
   window.sanamOwner={list:async()=>{const{data,error}=await sb.rpc("sanam_owner_companies");if(error)throw error;return data||[]},
     set:async c=>{const{error}=await sb.rpc("sanam_owner_set",{p_id:c.id,p_name:c.name,p_active:!!c.active,p_expires_on:c.expires_on||null,p_max_users:c.max_users||null,p_phone:c.phone||null,p_notes:c.notes||null});if(error)throw error},
     create:b=>window.sanamAdmin({action:"owner_create_company",...b}),password:(user_id,password)=>window.sanamAdmin({action:"owner_password",user_id,password}),remove:company_id=>window.sanamAdmin({action:"owner_delete_company",company_id})};
@@ -1100,7 +1102,7 @@ function stmtTable(st,sl){
 }
 function waPhone(ph){const d=String(ph||"").replace(/\D/g,"");if(!d)return"";if(d.startsWith("20"))return d;if(d.startsWith("0"))return "20"+d.slice(1);return d}
 function stmtWhatsText(st,sl){
-  const emp=st.kind==="employee";const L=[`*كشف حساب: ${st.name}*`,`سنام للمقاولات`,S.f.from||S.f.to?`الفترة: ${S.f.from?fmtDate(S.f.from):"البداية"} إلى ${fmtDate(S.f.to||today())}`:"",""];
+  const emp=st.kind==="employee";const L=[`*كشف حساب: ${st.name}*`,CO(),S.f.from||S.f.to?`الفترة: ${S.f.from?fmtDate(S.f.from):"البداية"} إلى ${fmtDate(S.f.to||today())}`:"",""];
   if(S.f.from)L.push(`رصيد ما قبل الفترة: ${money(sl.open)}`);
   const rows=sl.vis.slice(-45);if(rows.length<sl.vis.length)L.push(`(آخر ${rows.length} حركة)`);
   rows.forEach(r=>{const amt=emp?(r.got||r.add):(r.add||r.sub);L.push(`▪️ ${dayName(r.date)} ${fmtDate(r.date)}: ${r.desc} ${money(amt)}${r.project?" · "+r.project:""}`)});
@@ -1147,6 +1149,8 @@ function tafqeet(v){
   let out=parts.length?parts.join(" و"):"صفر";out+=" جنيه مصري";if(pt)out+=" و"+g(pt)+" قرش";
   return "فقط "+out+" لا غير";
 }
+const CO=()=>S.company||"سنام للمقاولات";
+const psLogo=()=>S.logo?`<div class="ps-logo" style="background:#fff;overflow:hidden"><img src="${S.logo}" alt="" style="width:100%;height:100%;object-fit:contain"></div>`:PS_LOGO;
 const PS_LOGO=`<div class="ps-logo"><svg viewBox="0 0 24 24" fill="none" stroke="#1b1206" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20"/><path d="M4 20V9l6-4 6 4v11"/><path d="M16 12h4v8"/><path d="M8 20v-4h4v4"/></svg></div>`;
 /* single movement as an official paper: مستخلص، فاتورة، إيصال، سند صرف */
 function docSpec(t){
@@ -1173,7 +1177,7 @@ function docSpec(t){
 async function renderSheet({title,meta,html,sign}){
   await ensureLibs();
   const sheet=document.createElement("div");sheet.className="ps";
-  sheet.innerHTML=`<div class="ps-h">${PS_LOGO}<div><b>سنام للمقاولات</b><small>${esc(meta||"مقاولات عامة وتشطيبات")}</small></div><div class="ps-t"><b>${esc(title)}</b><small>تاريخ الطباعة: ${fmtDate(today())}</small></div></div>${html}<div class="ps-sign">${(sign||["توقيع المحاسب","توقيع المدير","توقيع المستلم"]).map(x=>`<span>${esc(x)}</span>`).join("")}</div>`;
+  sheet.innerHTML=`<div class="ps-h">${psLogo()}<div><b>${esc(CO())}</b><small>${esc(meta||"مقاولات عامة وتشطيبات")}</small></div><div class="ps-t"><b>${esc(title)}</b><small>تاريخ الطباعة: ${fmtDate(today())}</small></div></div>${html}<div class="ps-sign">${(sign||["توقيع المحاسب","توقيع المدير","توقيع المستلم"]).map(x=>`<span>${esc(x)}</span>`).join("")}</div>`;
   sheet.querySelectorAll(".pill svg,.icon-btn,.acts").forEach(x=>x.remove());
   document.body.appendChild(sheet);
   try{
@@ -1205,7 +1209,7 @@ async function outputSheet(spec,mode){
   await saveFile(name+".pdf",pdf.output("blob"),"application/pdf");
 }
 function waModal(spec,copied,saved){
-  const ph=waPhone(spec.phone);const msg=`${spec.title}${spec.who?" - "+spec.who.n:""}\nسنام للمقاولات`;
+  const ph=waPhone(spec.phone);const msg=`${spec.title}${spec.who?" - "+spec.who.n:""}\n${CO()}`;
   const link=`https://wa.me/${ph}?text=${encodeURIComponent(msg)}`;
   modalCtx={col:"wa",rec:{}};
   $("#modalRoot").innerHTML=`<div class="scrim" data-act="close-scrim"><div class="modal" role="dialog" aria-modal="true" style="width:min(460px,100%)"><div class="modal-h"><span class="kpi-ic" style="width:40px;height:40px;background:#1fa855;color:#fff">${I("whatsapp")}</span><h3>الصورة جاهزة</h3><button type="button" class="icon-btn" data-act="close" aria-label="إغلاق">${I("x")}</button></div><div class="modal-b stack" style="gap:10px">
@@ -1283,7 +1287,7 @@ function viewIncome(){
   const per=S.f.from||S.f.to?`من ${S.f.from||"البداية"} إلى ${S.f.to||today()}`:"كل الفترات";
   return banner()+pageH("الإيرادات ناقص التكاليف المباشرة والمصروفات العمومية، عشان تعرف صافي ربح الشركة.",`<button class="btn" data-act="csv-income">${I("excel")}إكسل</button>${printBtns("income")}`)+dateFilters(projSelect("f-incProject",pf,"الشركة كلها"))+
   `<div class="kpis"><div class="card kpi"><div class="kpi-top"><span class="kpi-ic t-blue">${I("statement")}</span><div><div class="l">الإيرادات</div><div class="v">${Mc(rev)}</div></div></div></div><div class="card kpi"><div class="kpi-top"><span class="kpi-ic t-amber">${I("truck")}</span><div><div class="l">التكاليف المباشرة</div><div class="v">${Mc(direct)}</div></div></div></div><div class="card kpi"><div class="kpi-top"><span class="kpi-ic t-violet">${I("income")}</span><div><div class="l">مجمل الربح</div><div class="v">${Mc(grossP,grossP<0?"neg":"")}</div></div></div></div><div class="card kpi"><div class="kpi-top"><span class="kpi-ic ${net<0?"t-red":"t-green"}">${I("check")}</span><div><div class="l">صافي الربح</div><div class="v">${Mc(net,net<0?"neg":"pos")}</div></div></div><div class="h">هامش صافي <b class="num">${rev?Math.round(net/rev*100)+"%":"—"}</b></div></div></div>
-  <div class="card"><div class="tbl-top"><h2>قائمة الدخل · ${esc(pf?nameOf("projects",pf):"سنام للمقاولات")}</h2><div class="row"><span class="muted">${esc(per)}</span></div></div><div class="tbl-wrap"><table class="inc"><thead><tr><th>البند</th><th class="n">المبلغ (ج.م)</th><th class="n">من الإيرادات</th></tr></thead><tbody>
+  <div class="card"><div class="tbl-top"><h2>قائمة الدخل · ${esc(pf?nameOf("projects",pf):CO())}</h2><div class="row"><span class="muted">${esc(per)}</span></div></div><div class="tbl-wrap"><table class="inc"><thead><tr><th>البند</th><th class="n">المبلغ (ج.م)</th><th class="n">من الإيرادات</th></tr></thead><tbody>
   ${line("الإيرادات",0,{b:1,cls:"sec"}).replace(/<td class="n">.*?<\/tr>/s,'<td></td><td></td></tr>')}
   ${line("مستخلصات العملاء (أعمال منفذة)",rev,{sub:1})}
   ${line("إجمالي الإيرادات",rev,{b:1,cls:"tot"})}
@@ -1324,11 +1328,25 @@ const nameU=u=>String(u||"").replace(/@sanam\.local$/,"");
 function groupBadge(m,g){if(m.is_admin)return `<span class="pill t-green">كامل</span>`;const p=m.permissions||{};const n=g.tabs.filter(([t])=>p[t]&&p[t].view).length;
   return n===g.tabs.length?`<span class="pill t-green">كامل</span>`:n?`<span class="pill t-amber">جزئي ${n}/${g.tabs.length}</span>`:`<span class="muted">—</span>`}
 function loadMembers(){if(S.membersLoading)return;S.membersLoading=true;window.sanamMembers().then(m=>{S.members=m;S.membersErr=""}).catch(e=>{S.membersErr=e.message||"تعذر التحميل"}).finally(()=>{S.membersLoading=false;render()})}
+function applyBrand(){const im=$(".brand .logo img");if(im)im.src=S.logo||"icon-192.png";const bs=$(".brand small");if(bs)bs.textContent=S.company&&S.company!=="سنام للمقاولات"?S.company:"نظام إدارة المشاريع والحسابات"}
+function companyCard(){return `<div class="card" style="margin-bottom:16px"><div class="card-b"><div class="row" style="gap:16px;align-items:center;flex-wrap:wrap">
+  <div style="width:84px;height:84px;border-radius:16px;border:1px solid #d3dbe6;background:#fff;display:grid;place-items:center;overflow:hidden;flex:none"><img id="co-logo-prev" src="${esc(S.logo||"icon-192.png")}" alt="شعار الشركة" style="width:100%;height:100%;object-fit:contain"></div>
+  <div class="stack" style="flex:1;min-width:220px;gap:8px"><b>بيانات الشركة اللي بتظهر في البرنامج والطباعة وكشوف الحساب</b>
+   <label>اسم الشركة<input id="co-my-name" value="${esc(S.company||"")}"></label>
+   <div class="row" style="gap:8px;flex-wrap:wrap"><label class="btn small" style="cursor:pointer">${I("upload")}اختار اللوجو<input type="file" id="co-logo-file" accept="image/*" hidden></label>${S.logo?`<button class="btn small" data-act="co-logo-clear">شيل اللوجو</button>`:""}<button class="btn primary small" data-act="co-save-brand">${I("check")}حفظ</button></div></div></div></div></div>`}
+async function logoData(file){const img=await new Promise((res,rej)=>{const u=URL.createObjectURL(file),i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=u});
+  const k=Math.min(1,320/Math.max(img.width,img.height));const c=document.createElement("canvas");c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+  let d=c.toDataURL("image/png");if(d.length>300000)d=c.toDataURL("image/jpeg",.85);return d}
+document.addEventListener("change",e=>{if(e.target.id!=="co-logo-file"||!e.target.files[0])return;logoData(e.target.files[0]).then(d=>{S.pendingLogo=d;$("#co-logo-prev").src=d;toast("دوس حفظ عشان اللوجو يتثبت")}).catch(()=>toast("الصورة دي مش مدعومة"))});
+document.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b)return;const a=b.dataset.act;
+  if(a==="co-logo-clear"){S.pendingLogo="";$("#co-logo-prev").src="icon-192.png";return}
+  if(a==="co-save-brand"){const name=$("#co-my-name").value.trim();if(!name){toast("اكتب اسم الشركة");return}const logo=S.pendingLogo!==undefined?S.pendingLogo:S.logo;b.disabled=true;
+    window.sanamCompany({name,logo:logo||null}).then(()=>{S.company=name;S.logo=logo||"";delete S.pendingLogo;applyBrand();render();toast("اتحفظ")}).catch(x=>{b.disabled=false;toast("ماتحفظش: "+(x.message||""))})}});
 function viewUsers(){
   if(!window.sanamMembers)return emptyBox("users","الشاشة دي شغالة بس على النسخة الأونلاين","");
   if(!S.members&&!S.membersErr){loadMembers();return pageH("بتحمّل المستخدمين…")}
   const ms=S.members||[];
-  return pageH("ضيف الناس اللي هتشتغل معاك على البرنامج، وحدد كل واحد يشوف إيه ويعدل إيه ويحذف إيه.",`<button class="btn primary" data-act="u-add">${I("plus")}مستخدم جديد</button>`)+
+  return companyCard()+pageH("ضيف الناس اللي هتشتغل معاك على البرنامج، وحدد كل واحد يشوف إيه ويعدل إيه ويحذف إيه.",`<button class="btn primary" data-act="u-add">${I("plus")}مستخدم جديد</button>`)+
   (S.membersErr?`<div class="banner slim" style="background:#fdecec;color:#5a1a1a"><span>${esc(S.membersErr)}</span><button class="btn small" data-act="u-reload">حاول تاني</button></div>`:"")+
   `<div class="card"><div class="tbl-wrap"><table><thead><tr><th>المستخدم</th><th>النوع</th>${PG.map(g=>`<th>${esc(g.g)}</th>`).join("")}<th>الحالة</th><th></th></tr></thead><tbody>${ms.map(m=>{const self=m.user_id===window.SANAM_UID;return `<tr>
     <td>${ava(nameU(m.username),self?"إنت":"")}</td><td>${m.is_admin?`<span class="pill t-violet">مدير</span>`:`مستخدم${m.requires_approval?`<small class="muted" style="display:block">محتاج موافقة</small>`:""}`}</td>
@@ -1766,7 +1784,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&modalCtx)closeModal
     try{const w=u&&await u.can("data.write");if(w===false)S.canWrite=false}catch(e){}
     const got=new Set();let firstLoad=true;
     try{const me=u&&await u.me();if(me&&me.name)$("#avatar").textContent=initial(me.name);const ss=me&&me.session;
-      if(ss){if(ss.no_company){noCompany();return}if(ss.company_ok===false&&!ss.is_owner){subBlocked(ss);return}if(ss.active===false){blocked();return}PERM.owner=!!ss.is_owner;S.company=ss.company_name||"";S.expiresOn=ss.expires_on||"";if(S.company&&S.company!=="سنام للمقاولات"){const bs=$(".brand small");if(bs)bs.textContent=S.company}PERM.admin=!!ss.is_admin;PERM.perms=ss.permissions||{};PERM.approval=!!ss.requires_approval;PERM.user=ss.username||""}}catch(e){}
+      if(ss){if(ss.no_company){noCompany();return}if(ss.company_ok===false&&!ss.is_owner){subBlocked(ss);return}if(ss.active===false){blocked();return}PERM.owner=!!ss.is_owner;S.company=ss.company_name||"";S.logo=ss.logo||"";applyBrand();S.expiresOn=ss.expires_on||"";PERM.admin=!!ss.is_admin;PERM.perms=ss.permissions||{};PERM.approval=!!ss.requires_approval;PERM.user=ss.username||""}}catch(e){}
     COLS.forEach(c=>db.collection(c).onSnapshot(snap=>{
       const list=snap.docs.map(x=>({id:x.id,...x.data()}));got.add(c);
       // while the demo is showing, live data goes to the saved copy so the demo stays separate
