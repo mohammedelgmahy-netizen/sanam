@@ -556,7 +556,7 @@ window.SANAM_CFG={url:"https://lhamdnaxioxqptkylvkg.supabase.co",key:"eyJhbGciOi
     const x=C(c),r=x.map.get(id);if(ok&&r){const d={...r.data};delete d.pending;x.map.set(id,{id,data:d})}else x.map.delete(id);emit(c);saveCache()};
   window.sanamOwner={list:async()=>{const{data,error}=await sb.rpc("sanam_owner_companies");if(error)throw error;return data||[]},
     set:async c=>{const{error}=await sb.rpc("sanam_owner_set",{p_id:c.id,p_name:c.name,p_active:!!c.active,p_expires_on:c.expires_on||null,p_max_users:c.max_users||null,p_phone:c.phone||null,p_notes:c.notes||null});if(error)throw error},
-    create:b=>window.sanamAdmin({action:"owner_create_company",...b}),password:(user_id,password)=>window.sanamAdmin({action:"owner_password",user_id,password})};
+    create:b=>window.sanamAdmin({action:"owner_create_company",...b}),password:(user_id,password)=>window.sanamAdmin({action:"owner_password",user_id,password}),remove:company_id=>window.sanamAdmin({action:"owner_delete_company",company_id})};
   window.sanamLogout=async()=>{if(window.SANAM_DEMO){try{localStorage.removeItem("sanam-trial-start-on")}catch(e){}location.href=location.pathname;return}try{localStorage.removeItem(ck());localStorage.removeItem(sk())}catch(e){}
     // sign out on this phone even when Supabase can't be reached
     try{await sb.auth.signOut({scope:"local"})}catch(e){}
@@ -1418,7 +1418,7 @@ function viewOwner(){
     <td>${ava(c.name,c.mine?"شركتك":"")}</td><td dir="ltr" style="text-align:right">${esc(nameU(c.admin||"—"))}</td><td class="num">${esc(c.phone||"—")}</td>
     <td class="n num">${c.users}${c.max_users?" / "+c.max_users:""}</td><td class="n num">${c.records}</td><td class="num muted">${c.last_activity?esc(fmtDate(c.last_activity.slice(0,10))):"—"}</td>
     <td class="num">${c.expires_on?esc(fmtDate(c.expires_on)):"مفتوح"}</td><td><span class="pill ${s[0]}">${s[1]}</span></td>
-    <td class="acts"><div class="row" style="flex-wrap:nowrap;gap:6px"><button class="icon-btn" data-act="co-edit" data-id="${c.id}" aria-label="تعديل" title="تعديل وتجديد">${I("edit")}</button>${c.mine?"":`<button class="btn small" data-act="co-toggle" data-id="${c.id}">${c.active?"إيقاف":"تفعيل"}</button>`}${c.admin_id&&!c.mine?`<button class="btn small" data-act="co-pass" data-id="${c.id}">كلمة سر المدير</button>`:""}</div></td></tr>`}).join("")}</tbody></table></div></div>`;
+    <td class="acts"><div class="row" style="flex-wrap:nowrap;gap:6px"><button class="icon-btn" data-act="co-edit" data-id="${c.id}" aria-label="تعديل" title="تعديل وتجديد">${I("edit")}</button>${c.mine?"":`<button class="btn small" data-act="co-toggle" data-id="${c.id}">${c.active?"إيقاف":"تفعيل"}</button>`}${c.admin_id&&!c.mine?`<button class="btn small" data-act="co-pass" data-id="${c.id}">كلمة سر المدير</button>`:""}${c.mine?"":`<button class="icon-btn del" data-act="co-del" data-id="${c.id}" aria-label="حذف الشركة" title="حذف الشركة">${I("trash")}</button>`}</div></td></tr>`}).join("")}</tbody></table></div></div>`;
 }
 function coForm(c){
   const v=k=>esc(c?c[k]??"":"");
@@ -1451,6 +1451,10 @@ function ownerAct(a,ds,b){
   if(a==="co-plus"){const e=$("#co-exp");e.value=addMonths(+ds.m,$("#coform").dataset.id?e.value:"");return true}
   if(a==="co-toggle"){const c=find(ds.id);if(!c)return true;if(c.active&&!confirm("إيقاف اشتراك "+c.name+"؟ مش هيقدروا يدخلوا، والبيانات هتفضل محفوظة."))return true;b.disabled=true;
     window.sanamOwner.set({...c,active:!c.active}).then(()=>{toast(c.active?"اتوقفت":"اتفعّلت");S.cos=null;render()}).catch(e=>{b.disabled=false;toast(e.message)});return true}
+  if(a==="co-del"){const c=find(ds.id);if(!c||c.mine)return true;
+    const t=prompt("حذف شركة «"+c.name+"» نهائي؟\nهيتمسح معاها كل بياناتها ومستخدمينها ("+c.users+" مستخدم، "+c.records+" سجل)، والحذف مش بيرجع.\n\nاكتب كلمة: حذف");
+    if(t===null)return true;if(t.trim()!=="حذف"){toast("ماتحذفتش. لازم تكتب كلمة «حذف»");return true}
+    b.disabled=true;window.sanamOwner.remove(c.id).then(()=>{toast("الشركة اتحذفت");S.cos=null;render()}).catch(e=>{b.disabled=false;toast(e.message)});return true}
   if(a==="co-pass"){const c=find(ds.id);if(!c)return true;const p=prompt("كلمة سر جديدة لمدير "+c.name+" (٨ حروف على الأقل):",Math.random().toString(36).slice(2,10));if(!p)return true;
     if(p.length<8){toast("كلمة السر لازم تكون ٨ حروف على الأقل");return true}
     window.sanamOwner.password(c.admin_id,p).then(()=>credsBox(c.name,nameU(c.admin),p,c.phone)).catch(e=>toast(e.message));return true}

@@ -24,8 +24,27 @@ Deno.serve(async (req) => {
     const { data: own } = await admin.from("sanam_owners").select("user_id").eq("user_id", who.user.id).maybeSingle();
 
     // ---- app owner: open a company for a new subscriber, reset its admin's password ----
-    if (b.action === "owner_create_company" || b.action === "owner_password") {
+    if (b.action === "owner_create_company" || b.action === "owner_password" || b.action === "owner_delete_company") {
       if (!own) return reply({ error: "الشاشة دي لصاحب البرنامج بس" }, 403);
+      if (b.action === "owner_delete_company") {
+        const { data: co } = await admin.from("sanam_companies").select("id").eq("id", b.company_id).maybeSingle();
+        if (!co) return reply({ error: "الشركة دي مش موجودة" }, 404);
+        const { data: ms } = await admin.from("sanam_members").select("user_id").eq("company_id", co.id);
+        if ((ms || []).some((m: any) => m.user_id === who.user.id)) return reply({ error: "مينفعش تحذف شركتك إنت" }, 400);
+        // site photos live under the company's folder
+        try {
+          const st = admin.storage.from("sanam-photos");
+          const { data: months } = await st.list(co.id, { limit: 1000 });
+          for (const m of months || []) {
+            const { data: files } = await st.list(co.id + "/" + m.name, { limit: 1000 });
+            if (files?.length) await st.remove(files.map((f: any) => co.id + "/" + m.name + "/" + f.name));
+          }
+        } catch (_) { /* photos are best effort */ }
+        const { error } = await admin.from("sanam_companies").delete().eq("id", co.id); // members and records go with it
+        if (error) return reply({ error: error.message }, 400);
+        for (const m of ms || []) await admin.auth.admin.deleteUser(m.user_id);
+        return reply({ ok: true });
+      }
       if (b.action === "owner_password") {
         if (String(b.password || "").length < 8) return reply({ error: "كلمة السر لازم تكون ٨ حروف على الأقل" }, 400);
         // only Sanam company accounts, never other apps' users in this project
