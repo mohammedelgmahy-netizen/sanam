@@ -619,6 +619,9 @@ window.SANAM_CFG={url:"https://lhamdnaxioxqptkylvkg.supabase.co",key:"eyJhbGciOi
 #sbLogin .lg-or{color:#98a2b3;font-size:13px;margin:2px 0}
 #sbLogin button.lg-demo{background:#fff;color:#714b67;border:2px solid #714b67}
 #sbLogin .lg-sw{color:#714b67;font-weight:700;font-size:13.5px;text-decoration:none}
+/* floating WhatsApp/install buttons covered the login buttons on phones */
+body:has(#sbLogin) #supportBtn,body:has(#sbLogin) #installBtn{display:none!important}
+#sbLogin{overflow-y:auto}
 </style>
 <script>
 document.documentElement.dir="rtl";document.documentElement.lang="ar";
